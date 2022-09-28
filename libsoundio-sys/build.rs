@@ -43,6 +43,11 @@ fn main() {
             .status();
     }
 
+    // 支持在 Windows 平台构建。在 Windows 平台上，没有 stdatomic.h 头文件，因此，切换到 cpp 模式。
+    if cfg!(windows) {
+        set_global_cpp_mode();
+    }
+
     let target = env::var("TARGET").unwrap();
     let host = env::var("HOST").unwrap();
 
@@ -112,4 +117,20 @@ fn main() {
         println!("cargo:rustc-link-lib=framework=CoreAudio");
         println!("cargo:rustc-link-lib=framework=CoreFoundation");
     }
+}
+
+fn set_global_cpp_mode() {
+    let cmake_config = [
+        "file(GLOB_RECURSE CFILES \"${CMAKE_SOURCE_DIR}/*.c\")",
+        "set_source_files_properties(${CFILES} PROPERTIES LANGUAGE CXX)",
+    ];
+    let cmake_path = concat!(env!("CARGO_MANIFEST_DIR"), "/libsoundio/CMakeLists.txt");
+    let mut cmake_content = std::fs::read_to_string(cmake_path).unwrap();
+    for line in cmake_config.iter().rev() {
+        if !cmake_content.contains(line) {
+            cmake_content.insert_str(0, "\n");
+            cmake_content.insert_str(0, line);
+        }
+    }
+    std::fs::write(cmake_path, cmake_content).unwrap();
 }
